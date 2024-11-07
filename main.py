@@ -9,22 +9,28 @@ def get_hh_vacancies(language):
     vacancies = []
     page = 0
     total_pages = 1
+    vacancies_found = 0
+    moscow_area_id = 1
+    search_period = 30
+    per_page = 100
     params = {
         'text': language,
-        'area': 1,
-        'period': 30,
-        'per_page': 100
+        'area': moscow_area_id,
+        'period': search_period,
+        'per_page': per_page
     }
 
     while page < total_pages:
         params['page'] = page
         response = requests.get(url, params=params)
         response.raise_for_status()
-        data = response.json()
-        vacancies.extend(data['items'])
-        total_pages = data['pages']
+        hh_vacancies = response.json()
+        if page == 0:
+            vacancies_found = hh_vacancies['found']
+        vacancies.extend(hh_vacancies['items'])
+        total_pages = hh_vacancies['pages']
         page += 1
-    return vacancies
+    return vacancies, vacancies_found
 
 
 def predict_salary(salary_from, salary_to):
@@ -45,18 +51,17 @@ def predict_rub_salary_hh(vacancy):
 def get_hh_statistics(languages):
     statistics = {}
     for language in languages:
-        vacancies = get_hh_vacancies(language)
-        vacancies_found = len(vacancies)
+        vacancies, vacancies_found = get_hh_vacancies(language)
         vacancies_processed = 0
         total_salary = 0
 
         for vacancy in vacancies:
             salary = predict_rub_salary_hh(vacancy)
-            if salary is not None:
+            if salary:
                 vacancies_processed += 1
                 total_salary += salary
 
-        if vacancies_processed > 0:
+        if vacancies_processed:
             average_salary = int(total_salary / vacancies_processed)
         else:
             average_salary = 0
@@ -74,25 +79,31 @@ def get_sj_vacancies(language, secret_key):
     page = 0
     has_more = True
     url = 'https://api.superjob.ru/2.0/vacancies/'
+    moscow_area_id = 4
+    category_id = 48
+    per_page = 100
+    vacancies_found = 0
     headers = {
         'X-Api-App-Id': secret_key
     }
     params = {
         'keyword': language,
-        'town': 4,
-        'catalogues': 48,
-        'count': 100
+        'town': moscow_area_id,
+        'catalogues': category_id,
+        'count': per_page
     }
 
     while has_more:
         params['page'] = page
         response = requests.get(url, headers=headers, params=params)
         response.raise_for_status()
-        data = response.json()
-        vacancies.extend(data['objects'])
+        sj_vacancies = response.json()
+        if page == 0:
+            vacancies_found = sj_vacancies['total']
+        vacancies.extend(sj_vacancies['objects'])
         page += 1
-        has_more = data['more']
-    return vacancies
+        has_more = sj_vacancies['more']
+    return vacancies, vacancies_found
 
 
 def predict_rub_salary_sj(vacancy):
@@ -104,18 +115,17 @@ def predict_rub_salary_sj(vacancy):
 def get_sj_statistics(languages, secret_key):
     statistics = {}
     for language in languages:
-        vacancies = get_sj_vacancies(language, secret_key)
-        vacancies_found = len(vacancies)
+        vacancies, vacancies_found = get_sj_vacancies(language, secret_key)
         vacancies_processed = 0
         total_salary = 0
 
         for vacancy in vacancies:
             salary = predict_rub_salary_sj(vacancy)
-            if salary is not None:
+            if salary:
                 vacancies_processed += 1
                 total_salary += salary
 
-        if vacancies_processed > 0:
+        if vacancies_processed:
             average_salary = int(total_salary / vacancies_processed)
         else:
             average_salary = 0
